@@ -10,6 +10,9 @@ import java.util.List;
 
 import it.polito.tdp.formulaone.model.Circuit;
 import it.polito.tdp.formulaone.model.Constructor;
+import it.polito.tdp.formulaone.model.Driver;
+import it.polito.tdp.formulaone.model.DriverIdMap;
+import it.polito.tdp.formulaone.model.DriverSeasonResult;
 import it.polito.tdp.formulaone.model.Season;
 
 
@@ -57,6 +60,7 @@ public class FormulaOneDAO {
 			
 			conn.close();
 			return list ;
+			
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -111,5 +115,69 @@ public class FormulaOneDAO {
 			throw new RuntimeException("SQL Query Error");
 		}
 	}
+
+	public List<Driver> getAllDriversBySeason(Season season,  DriverIdMap driverIdMap) {
+		String sql = "SELECT DISTINCT d.driverId, forename, surname\n" + 
+				"FROM drivers as d, races as ra , results as re\n" + 
+				"WHERE ra.year = ? AND ra.raceId = re.raceId AND re.driverId = d.driverId AND re.position is not null";
+
+		try {
+			Connection conn = ConnectDB.getConnection();
+
+			PreparedStatement st = conn.prepareStatement(sql);
+			st.setInt(1, season.getYear().getValue());
+			ResultSet rs = st.executeQuery();
+
+			List<Driver> drivers = new ArrayList<>();
+			while (rs.next()) {
+				drivers.add(driverIdMap.get(new Driver(rs.getInt("driverId"), rs.getString("forename"), rs.getString("surname"))));
+			}
+
+			conn.close();
+			return drivers;
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+			throw new RuntimeException("SQL Query Error");
+		}
+	}
+
 	
+	public List<DriverSeasonResult> getDriverSeasonResults(Season season, DriverIdMap driverIdMap) {
+		String sql = "SELECT r1.driverid as d1, r2.driverid as d2, count(*)"
+				+ "FROM races, results as r1, results as r2"
+				+ "WHERE races.year = 2000 AND r1.raceId = races.raceId AND r1.position is not null AND r1.raceId = r2.raceId AND r1.position > r2.position "
+				+ "GROUP BY d1, d2";
+		try {
+			Connection conn = ConnectDB.getConnection();
+
+			PreparedStatement st = conn.prepareStatement(sql);
+			st.setInt(1, season.getYear().getValue());
+			ResultSet rs = st.executeQuery();
+
+			List<DriverSeasonResult> result = new ArrayList<>();
+			while (rs.next()) {
+				Driver d1 = driverIdMap.get(rs.getInt("d1"));
+				Driver d2 = driverIdMap.get(rs.getInt("d2"));
+				int cnt = rs.getInt("cnt");
+				if(d1 == null || d2 == null) {
+					System.err.format("Skipping %d %d", rs.getInt("d1"), rs.getInt("d2"));
+				}
+				result.add(new DriverSeasonResult(d1, d2, cnt));
+			}
+
+			conn.close();
+			return result;
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+			throw new RuntimeException("SQL Query Error");
+		}
+	}
+	
+
+
+
+
 }
+
